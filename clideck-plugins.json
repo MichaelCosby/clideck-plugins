@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    {
+      "id": "claude-autoapprove",
+      "name": "Auto-approve",
+      "path": "plugins/claude-autoapprove"
+    }
+  ]
+}
