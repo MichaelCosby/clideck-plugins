@@ -8,6 +8,7 @@ const SETTINGS_FILE = join(os.homedir(), '.claude', 'settings.json');
 
 const approveEnabled = new Set();
 const approveCounts = new Map();
+const approveModes = new Map();
 let setupOk = false;
 let api = null;
 
@@ -16,21 +17,24 @@ function signalPath(id) {
 }
 
 function stateFor(sessionId) {
-  return { sessionId, enabled: approveEnabled.has(sessionId), count: approveCounts.get(sessionId) || 0, setupOk };
+  return { sessionId, enabled: approveEnabled.has(sessionId), count: approveCounts.get(sessionId) || 0, mode: approveModes.get(sessionId) || null, setupOk };
 }
 
 function toggleSession(sessionId) {
   if (approveEnabled.has(sessionId)) {
     approveEnabled.delete(sessionId);
     approveCounts.delete(sessionId);
+    approveModes.delete(sessionId);
     try { unlinkSync(signalPath(sessionId)); } catch {}
   } else {
-    try { writeFileSync(signalPath(sessionId), ''); } catch (e) {
+    const mode = api.getSetting('mode') || 'supervised';
+    try { writeFileSync(signalPath(sessionId), mode); } catch (e) {
       api.log(`Failed to create signal file: ${e.message}`);
       return;
     }
     approveEnabled.add(sessionId);
     approveCounts.set(sessionId, 0);
+    approveModes.set(sessionId, mode);
   }
   api.sendToFrontend('state', stateFor(sessionId));
 }

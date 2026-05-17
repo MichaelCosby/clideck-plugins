@@ -1,7 +1,11 @@
 'use strict';
 
 const ICON_LOCKED = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`;
-const ICON_UNLOCKED = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-3.46"/></svg>`;
+const MODE_DOT = { 'laissez-faire': '#f87171', 'supervised': '#60a5fa' };
+function iconUnlocked(mode) {
+  const dot = MODE_DOT[mode] || MODE_DOT['supervised'];
+  return `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-3.46"/><circle cx="12" cy="16" r="2" fill="${dot}" stroke="none"/></svg>`;
+}
 const ICON_WARN = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>`;
 
 let api = null;
@@ -100,10 +104,12 @@ function renderButton(state) {
 
   const enabled = state?.enabled;
   const count = state?.count || 0;
-  toolbarBtn.innerHTML = (enabled ? ICON_UNLOCKED : ICON_LOCKED) +
+  const mode = state?.mode || 'supervised';
+  toolbarBtn.innerHTML = (enabled ? iconUnlocked(mode) : ICON_LOCKED) +
     (enabled && count > 0 ? `<span class="autoapprove-badge">${count > 99 ? '99+' : count}</span>` : '');
+  const modeLabel = mode === 'laissez-faire' ? 'laissez-faire' : 'supervised';
   toolbarBtn.title = enabled
-    ? `Auto-approve ON — ${count} approved this session (click to disable)`
+    ? `Auto-approve ON (${modeLabel}) — ${count} approved this session (click to disable)`
     : 'Auto-approve OFF — click to enable for this session';
   if (enabled) toolbarBtn.classList.add('autoapprove-on');
 }
