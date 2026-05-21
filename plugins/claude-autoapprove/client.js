@@ -1,10 +1,10 @@
 'use strict';
 
-const ICON_LOCKED = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`;
-const MODE_DOT = { 'laissez-faire': '#f87171', 'supervised': '#60a5fa' };
-function iconUnlocked(mode) {
-  const dot = MODE_DOT[mode] || MODE_DOT['supervised'];
-  return `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-3.46"/><circle cx="12" cy="16" r="2" fill="${dot}" stroke="none"/></svg>`;
+const ICON_SNAIL = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="12" r="5.5"/><path d="M13 12a3 3 0 0 1 6 0"/><path d="M10.5 15Q6 16 4 14Q3 12.5 4.5 11.5"/><line x1="4.5" y1="11.5" x2="3" y2="9"/><line x1="4.5" y1="11.5" x2="6" y2="9"/></svg>`;
+const FLAME_COLOR = { 'laissez-faire': '#f97316', 'supervised': '#60a5fa' };
+function iconRocket(mode) {
+  const flame = FLAME_COLOR[mode] || FLAME_COLOR['supervised'];
+  return `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C11 4 9 7 9 12v2h6v-2C15 7 13 4 12 2z"/><circle cx="12" cy="8" r="1.5" fill="currentColor" stroke="none"/><path d="M9 12L7 17"/><path d="M15 12L17 17"/><path d="M10 14C9 17.5 11 21 12 21C13 21 15 17.5 14 14" fill="${flame}" stroke="${flame}" stroke-width="1"/></svg>`;
 }
 const ICON_WARN = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>`;
 
@@ -19,7 +19,7 @@ export function init(pluginApi) {
 
   toolbarBtn = api.addToolbarButton({
     title: 'Auto-approve',
-    icon: ICON_LOCKED,
+    icon: ICON_SNAIL,
     onClick: handleClick,
   });
 
@@ -105,7 +105,7 @@ function renderButton(state) {
   const enabled = state?.enabled;
   const count = state?.count || 0;
   const mode = state?.mode || 'supervised';
-  toolbarBtn.innerHTML = (enabled ? iconUnlocked(mode) : ICON_LOCKED) +
+  toolbarBtn.innerHTML = (enabled ? iconRocket(mode) : ICON_SNAIL) +
     (enabled && count > 0 ? `<span class="autoapprove-badge">${count > 99 ? '99+' : count}</span>` : '');
   const modeLabel = mode === 'laissez-faire' ? 'laissez-faire' : 'supervised';
   toolbarBtn.title = enabled
@@ -117,7 +117,7 @@ function renderButton(state) {
 const style = document.createElement('style');
 style.textContent = `
   button[data-plugin-id="claude-autoapprove"] { position: relative; }
-  .autoapprove-on { color: #60a5fa !important; }
+  .autoapprove-on { opacity: 1; }
   .autoapprove-warn { color: #f59e0b !important; }
   .autoapprove-busy { opacity: 0.5; pointer-events: none; }
   .autoapprove-badge {

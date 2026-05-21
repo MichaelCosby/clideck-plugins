@@ -6,7 +6,7 @@ When enabled for a session, Claude Code's `PermissionRequest` hook approves all 
 
 ## How it works
 
-- A lock icon appears in the CliDeck toolbar, reflecting the active session's state
+- A snail icon appears in the CliDeck toolbar when off; it becomes a rocket with colored flames when on
 - Clicking it toggles auto-approve on or off for that session
 - When on, a badge on the button counts how many approvals have been auto-granted
 - Auto-approve is intentionally inert outside of CliDeck — it only activates when `CLIDECK_SESSION_ID` is present in the environment
@@ -21,7 +21,7 @@ In CliDeck's Plugins panel:
 MichaelCosby/clideck-plugins/plugins/claude-autoapprove
 ```
 
-Then click the lock icon in the toolbar and choose **Auto Setup** to configure the Claude Code hook, or add it manually:
+Then click the snail icon in the toolbar and choose **Auto Setup** to configure the Claude Code hook, or add it manually:
 
 ```json
 {
