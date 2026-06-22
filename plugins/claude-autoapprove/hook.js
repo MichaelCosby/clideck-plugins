@@ -49,7 +49,7 @@ process.stdin.on('end', () => {
     const req = http.request({
       hostname: 'localhost',
       port,
-      path: '/hook/autoapprove',
+      path: '/hook/plugin/claude-autoapprove/approve',
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
       timeout: 2000,

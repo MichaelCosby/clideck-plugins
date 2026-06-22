@@ -99,13 +99,13 @@ exports.init = function init(pluginApi) {
   if (!setupOk) api.sendToFrontend('needsSetup', {});
 
   // Telemetry endpoint — hook fires this after approving, non-blocking
-  api.addRoute('POST', '/hook/autoapprove', (req, res, body) => {
-    const id = body?.clideck_id || '';
+  api.expose('approve', ({ clideck_id }) => {
+    const id = clideck_id || '';
     if (id && approveEnabled.has(id)) {
       approveCounts.set(id, (approveCounts.get(id) || 0) + 1);
       api.sendToFrontend('state', stateFor(id));
     }
-    res.writeHead(200).end('{}');
+    return {};
   });
 
   api.onFrontendMessage('toggle', msg => toggleSession(msg.sessionId));
