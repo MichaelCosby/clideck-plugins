@@ -21,3 +21,4 @@ MichaelCosby/clideck-plugins
 | Plugin | Description |
 |--------|-------------|
 | [claude-autoapprove](plugins/claude-autoapprove) | Per-session toggle to auto-approve Claude Code permission checks |
+| [sysmon](plugins/sysmon) | Toolbar readout of RAM, swap, and load average |

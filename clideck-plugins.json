@@ -4,6 +4,11 @@
       "id": "claude-autoapprove",
       "name": "Auto-approve",
       "path": "plugins/claude-autoapprove"
+    },
+    {
+      "id": "sysmon",
+      "name": "System Monitor",
+      "path": "plugins/sysmon"
     }
   ]
 }
