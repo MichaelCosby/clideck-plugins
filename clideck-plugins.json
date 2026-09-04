@@ -6,6 +6,11 @@
       "path": "plugins/claude-autoapprove"
     },
     {
+      "id": "file-drop",
+      "name": "File Drop",
+      "path": "plugins/file-drop"
+    },
+    {
       "id": "sysmon",
       "name": "System Monitor",
       "path": "plugins/sysmon"

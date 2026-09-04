@@ -1,0 +1,31 @@
+{
+  "id": "file-drop",
+  "name": "File Drop",
+  "version": "0.1.0",
+  "author": "Michael Cosby",
+  "description": "Drop, paste, or pick a screenshot to upload it to the server and insert its path at the cursor",
+  "icon": "<svg class=\"w-4 h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48\"/></svg>",
+  "settings": [
+    {
+      "key": "enabled",
+      "label": "Enabled",
+      "type": "toggle",
+      "default": true
+    },
+    {
+      "key": "uploadDir",
+      "label": "Upload Directory",
+      "type": "text",
+      "default": "",
+      "description": "Server-side directory for dropped files. Blank uses a clideck-drops folder in the system temp dir (cleared on reboot)."
+    },
+    {
+      "key": "maxSizeMb",
+      "label": "Max File Size (MB)",
+      "type": "number",
+      "default": 25,
+      "min": 1,
+      "max": 200
+    }
+  ]
+}
