@@ -1,10 +1,10 @@
 {
   "id": "claude-autoapprove",
   "name": "Auto-approve",
-  "version": "0.3.0",
+  "version": "1.0.0",
+  "apiVersion": 1,
   "description": "Per-session toggle to auto-approve Claude Code permission checks",
-  "author": "Michael Cosby",
-  "icon": "<svg class=\"w-4 h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"16\" cy=\"12\" r=\"5.5\"/><path d=\"M13 12a3 3 0 0 1 6 0\"/><path d=\"M10.5 15Q6 16 4 14Q3 12.5 4.5 11.5\"/><line x1=\"4.5\" y1=\"11.5\" x2=\"3\" y2=\"9\"/><line x1=\"4.5\" y1=\"11.5\" x2=\"6\" y2=\"9\"/></svg>",
+  "icon": "✓",
   "settings": [
     {
       "key": "mode",
@@ -15,7 +15,7 @@
         { "value": "supervised", "label": "Supervised" },
         { "value": "laissez-faire", "label": "Laissez-faire" }
       ],
-      "description": "Supervised: still prompts for plan approval (ExitPlanMode) and direct questions (AskUserQuestion). Laissez-faire: approves everything without exception."
+      "description": "Supervised: still prompts for plan approval (ExitPlanMode) and direct questions (AskUserQuestion). Laissez-faire: approves everything without exception. Applies to sessions enabled after the change."
     }
   ]
 }

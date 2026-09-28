@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0
+- Rewritten for CliDeck 2.x (plugin API 1). Requires CliDeck 2.x; 1.x keeps using 0.3.0.
+- The toolbar button becomes **Set up / Enable / Disable auto-approve** in a Claude Code session's menu, since 2.x plugins cannot add their own buttons. The approval count is shown when you disable it.
+- Signal files move to the plugin's private data folder, and the hook takes that folder as its argument instead of a port. Approvals are counted locally instead of over HTTP.
+- Setup honours `CLAUDE_CONFIG_DIR` and replaces the 1.x hook entry, so leftover 1.x signal files in `~/.clideck/autoapprove` are no longer read.
+- Signal files are also removed when a session closes.
+
 ## 0.3.0
 - Replaced lock icon with a **snail** (off) / **rocket** (on) icon scheme. Snail signals manual approval; rocket signals auto-approve is active.
 - Rocket flame color indicates mode: **blue** for supervised, **orange** for laissez-faire.

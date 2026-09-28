@@ -19,5 +19,5 @@ Plugins installed this way get **Update from GitHub** on their settings page.
 
 | Plugin | Description |
 |--------|-------------|
-| [claude-autoapprove](plugins/claude-autoapprove) | Per-session toggle to auto-approve Claude Code permission checks (1.x version; the 2.x port is pending) |
+| [claude-autoapprove](plugins/claude-autoapprove) | Per-session toggle to auto-approve Claude Code permission checks |
 | [sysmon](plugins/sysmon) | System monitor tab: RAM, swap, load history, and memory per session |
