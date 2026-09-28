@@ -4,21 +4,20 @@ Community plugins for [CliDeck](https://github.com/MichaelCosby/clideck).
 
 ## Installing a plugin
 
-In CliDeck's Plugins panel, paste a GitHub path into the install field:
+This branch holds the plugins for **CliDeck 2.x**; CliDeck 1.x uses the `main` branch.
+
+In CliDeck, go to **Settings → Plugins → Install plugin**, and under **Install from GitHub** enter the plugin's
+folder on this branch, for example:
 
 ```
-MichaelCosby/clideck-plugins/plugins/claude-autoapprove
+https://github.com/MichaelCosby/clideck-plugins/tree/clideck-2x/plugins/sysmon
 ```
 
-Or install the whole repo and pick from the list:
-
-```
-MichaelCosby/clideck-plugins
-```
+Plugins installed this way get **Update from GitHub** on their settings page.
 
 ## Plugins
 
 | Plugin | Description |
 |--------|-------------|
-| [claude-autoapprove](plugins/claude-autoapprove) | Per-session toggle to auto-approve Claude Code permission checks |
+| [claude-autoapprove](plugins/claude-autoapprove) | Per-session toggle to auto-approve Claude Code permission checks (1.x version; the 2.x port is pending) |
 | [sysmon](plugins/sysmon) | System monitor tab: RAM, swap, load history, and memory per session |
