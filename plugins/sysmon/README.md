@@ -1,25 +1,36 @@
 # sysmon
 
-A [CliDeck](https://github.com/MichaelCosby/clideck) plugin that adds a live RAM, swap, and load-average readout to the toolbar.
+A [CliDeck](https://github.com/MichaelCosby/clideck) 2.x plugin that shows how much memory and CPU load your
+sessions are using, in a **System monitor** tab next to the terminal.
 
-## How it works
+## What it shows
 
-- The server side polls memory/swap/load stats on an interval (default 15s, configurable 3-60s) and pushes them to connected clients.
-- On Linux, RAM usage is computed from `/proc/meminfo`'s `MemTotal`/`MemAvailable` (matching what `free` reports as "used"), not `os.freemem()`, which excludes reclaimable page cache and over-reports usage. Swap comes from `SwapTotal`/`SwapFree`; if no swap is configured, the readout shows "none" instead of 0%.
-- On non-Linux platforms, RAM falls back to `os.totalmem()`/`os.freemem()` (marked "(approx)" in the tooltip since it can't distinguish reclaimable cache from real usage), and swap is not reported.
-- Load average comes from `os.loadavg()` (1m/5m/15m); unavailable on Windows.
-- The toolbar button shows the RAM percentage; hovering shows the full breakdown (RAM, swap, load average). The button turns yellow at the warn threshold and red at the critical threshold (both configurable, based on the higher of RAM% and swap%).
+- **RAM, swap and load average** right now, with a warning or critical label when a threshold is crossed.
+- **The last 15 minutes** of memory and load as line charts; hover for the exact values at any moment. The load
+  chart marks your core count, so you can see when the machine is oversubscribed.
+- **Memory by session**: each running session's agent plus every process it started (shells, test runners,
+  dev servers), with its share of RAM. This is the quickest way to find the session that is eating memory.
+- **Alerts**: a toast when RAM or swap crosses the warning or critical threshold, even with the tab closed.
+
+Open it from the terminal header's plugin menu: **System monitor**.
+
+On Linux, RAM use comes from `/proc/meminfo` (`MemTotal` minus `MemAvailable`, matching `free`). Elsewhere it
+falls back to `os.freemem()`, which counts reclaimable cache as used, so it is marked approximate and swap is
+not shown. Per-session memory uses `ps`, so it works on Linux and macOS.
 
 ## Install
 
-In CliDeck's Plugins panel:
+In CliDeck, **Settings → Plugins → Install plugin → Install from GitHub**:
 
 ```
-MichaelCosby/clideck-plugins/plugins/sysmon
+https://github.com/MichaelCosby/clideck-plugins/tree/clideck-2x/plugins/sysmon
 ```
+
+Plugins installed this way can later be updated with **Update from GitHub** on the plugin's page.
 
 ## Settings
 
-- **Refresh interval (seconds)** — how often to poll, 3-60s (default 15)
-- **Warn threshold (%)** — turns the readout yellow (default 80)
-- **Critical threshold (%)** — turns the readout red (default 93)
+- **Sampling interval (seconds)**: how often to sample, 3–60 (default 15)
+- **Warning threshold (%)**: RAM or swap use that raises a warning (default 80)
+- **Critical threshold (%)**: RAM or swap use that raises a critical alert (default 93)
+- **Alert when a threshold is crossed**: toasts on or off (default on)
