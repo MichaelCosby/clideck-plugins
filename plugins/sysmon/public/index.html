@@ -141,7 +141,7 @@
       chart(document.getElementById("load-chart"), hist, {
         max: top, unit: "", decimals: 2, ticks: [0, Math.round(top / 2), top],
         series: [{ key: "load1", label: "Load", color: "var(--load)" }],
-        rules: [{ value: l.cpus, cls: "cores", label: "Cores" }],
+        rules: [{ value: l.cpus, cls: "cores", text: `${l.cpus} cores` }],
       });
     }
   }
@@ -176,25 +176,26 @@
     svg += '<g class="axis">' + opt.ticks.map((v) => `<text x="${m.l - 6}" y="${y(v) + 3.5}" text-anchor="end">${v}${opt.unit}</text>`).join("");
     const minutes = Math.round((t1 - t0) / 60000);
     svg += `<text x="${m.l}" y="${H - 5}">${minutes ? "−" + minutes + "m" : "now"}</text><text x="${W - m.r}" y="${H - 5}" text-anchor="end">now</text></g>`;
+    // Every label on the right edge (threshold rules and line ends) is spaced as one set, so none overlap.
+    const labels = [];
     for (const r of opt.rules) {
       if (r.value == null || r.value > opt.max) continue;
       svg += `<line class="threshold ${r.cls}" x1="${m.l}" x2="${W - m.r}" y1="${y(r.value)}" y2="${y(r.value)}"/>`;
-      svg += `<text class="end-label" x="${W - m.r + 6}" y="${y(r.value) + 3.5}" style="fill:var(--faint)">${esc(r.label)} ${fmt(r.value)}</text>`;
+      labels.push({ y: y(r.value), text: r.text || `${r.label} ${fmt(r.value)}`, muted: true });
     }
-    const ends = [];
     for (const s of opt.series) {
       const pts = points.filter((p) => p[s.key] != null);
       if (!pts.length) continue;
       svg += `<path class="line" style="stroke:${s.color}" d="${pts.map((p, i) => (i ? "L" : "M") + x(p.at).toFixed(1) + " " + y(p[s.key]).toFixed(1)).join(" ")}"/>`;
       const last = pts[pts.length - 1];
-      ends.push({ s, cy: y(last[s.key]), cx: x(last.at), v: last[s.key] });
+      svg += `<circle class="end" cx="${x(last.at)}" cy="${y(last[s.key])}" r="4" style="fill:${s.color}"/>`;
+      labels.push({ y: y(last[s.key]), text: `${s.label} ${fmt(last[s.key])}` });
     }
-    ends.sort((a, b) => a.cy - b.cy);
-    for (let i = 1; i < ends.length; i++) if (ends[i].cy - ends[i - 1].cy < 13) ends[i].ly = ends[i - 1].cy + 13;
-    for (const e of ends) {
-      svg += `<circle class="end" cx="${e.cx}" cy="${e.cy}" r="4" style="fill:${e.s.color}"/>`;
-      svg += `<text class="end-label" x="${e.cx + 8}" y="${(e.ly || e.cy) + 3.5}">${esc(e.s.label)} ${fmt(e.v)}</text>`;
-    }
+    labels.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 13);
+    const overflow = labels.length ? labels[labels.length - 1].y - (H - m.b) : 0;
+    if (overflow > 0) for (const l of labels) l.y -= overflow;
+    for (const l of labels) svg += `<text class="end-label" x="${W - m.r + 8}" y="${l.y + 3.5}"${l.muted ? ' style="fill:var(--faint)"' : ""}>${esc(l.text)}</text>`;
     svg += `<g class="hover" visibility="hidden"><line class="cross" y1="${m.t}" y2="${H - m.b}"/>${opt.series.map((s) => `<circle class="end" r="4" data-key="${s.key}" style="fill:${s.color}"/>`).join("")}</g>`;
     svg += `<rect x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent"/></svg>`;
     host.innerHTML = svg + '<div class="tip" hidden></div>';
