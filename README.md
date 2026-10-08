@@ -4,13 +4,13 @@ Community plugins for [CliDeck](https://github.com/MichaelCosby/clideck).
 
 ## Installing a plugin
 
-This branch holds the plugins for **CliDeck 2.x**; CliDeck 1.x uses the `main` branch.
+The `main` branch holds the plugins for **CliDeck 2.x**; the CliDeck 1.x versions are on the `v1` branch.
 
 In CliDeck, go to **Settings → Plugins → Install plugin**, and under **Install from GitHub** enter the plugin's
-folder on this branch, for example:
+folder, for example:
 
 ```
-https://github.com/MichaelCosby/clideck-plugins/tree/clideck-2x/plugins/sysmon
+https://github.com/MichaelCosby/clideck-plugins/tree/main/plugins/sysmon
 ```
 
 Plugins installed this way get **Update from GitHub** on their settings page.
