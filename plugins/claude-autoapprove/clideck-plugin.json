@@ -1,7 +1,7 @@
 {
   "id": "claude-autoapprove",
   "name": "Auto-approve",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "apiVersion": 1,
   "description": "Per-session toggle to auto-approve Claude Code permission checks",
   "icon": "✓",

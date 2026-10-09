@@ -4,7 +4,22 @@ export function activate(api) {
   const isClaude = (context) => context?.session?.provider === 'claude-code';
   const isOn = (context) => state.enabled.includes(context?.session?.id);
 
-  const offState = api.onMessage('state', (next) => { if (next) state = next; });
+  // Sessions where auto-approve is on wear a badge in their header and sidebar row (CliDeck 2.4+ hosts).
+  let badged = new Set();
+  const paintBadges = () => {
+    if (typeof api.setSessionBadge !== 'function') return;
+    const on = new Set(state.enabled);
+    for (const id of badged) if (!on.has(id)) api.setSessionBadge(id, null);
+    for (const id of on) {
+      const mode = state.modes?.[id] === 'laissez-faire' ? 'laissez-faire' : 'supervised';
+      api.setSessionBadge(id, {
+        label: mode === 'laissez-faire' ? 'Auto-approve: all' : 'Auto-approve', icon: '✓',
+        title: `Auto-approving Claude's permission checks (${mode}${mode === 'supervised' ? ': plan approval and questions still ask you' : ''}). Turn it off from the session menu.`,
+      });
+    }
+    badged = on;
+  };
+  const offState = api.onMessage('state', (next) => { if (next) { state = next; paintBadges(); } });
   const offResult = api.onMessage('result', (result) => {
     api.toast(result?.ok ? 'success' : 'error', { id: 'claude-autoapprove', title: 'Auto-approve', body: String(result?.text || '') });
   });

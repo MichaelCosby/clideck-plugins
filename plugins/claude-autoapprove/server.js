@@ -42,7 +42,7 @@ function createService(api, env = process.env) {
   }
 
   function state() {
-    return { setupOk: setupOk(), enabled: [...enabled.keys()] };
+    return { setupOk: setupOk(), enabled: [...enabled.keys()], modes: Object.fromEntries(enabled) };
   }
 
   // Replaces any earlier entry from this plugin, including a 1.x one that read ~/.clideck/autoapprove.
@@ -78,10 +78,18 @@ function createService(api, env = process.env) {
     return mode;
   }
 
-  function start() {
+  // Auto-approve stays on for a session across engine restarts, updates and resumes: the signal files are the
+  // record. Only files for sessions that no longer exist (deleted while CliDeck was down) are cleared.
+  async function start(sessionExists) {
     mkdirSync(signalDir, { recursive: true });
-    // Nothing is enabled when the plugin starts, so any file left from a previous run is stale.
-    for (const name of readdirSync(signalDir)) remove(join(signalDir, name));
+    for (const name of readdirSync(signalDir)) {
+      const id = name.replace(/\.approved$/, '');
+      if (!(await sessionExists(id))) { remove(join(signalDir, name)); continue; }
+      if (name !== id) continue;
+      let mode = 'supervised';
+      try { mode = readFileSync(join(signalDir, name), 'utf8').trim(); } catch {}
+      enabled.set(id, MODES.has(mode) ? mode : 'supervised');
+    }
   }
 
   return { state, installHook, enable, disable, start, enabled, settingsFile, signalDir };
@@ -89,8 +97,10 @@ function createService(api, env = process.env) {
 
 async function activate(api) {
   const service = createService(api);
-  service.start();
+  const sessionExists = async (id) => Boolean(await api.getSession(id).catch(() => null));
+  await service.start(sessionExists);
   const publish = () => api.sendToClients('state', service.state());
+  publish();
 
   api.onClientMessage('get-state', (_data, context) => context.reply('state', service.state()));
 
@@ -122,15 +132,12 @@ async function activate(api) {
     publish();
   });
 
-  api.onEvent('session.closed', (event) => {
-    if (event.sessionId && service.enabled.has(event.sessionId)) {
-      service.disable(event.sessionId);
-      publish();
-    }
-  });
-
-  api.onShutdown(() => {
-    for (const id of [...service.enabled.keys()]) service.disable(id);
+  // A stopped session keeps auto-approve for when it resumes; a deleted one (gone from CliDeck) is cleaned up.
+  api.onEvent('session.closed', async (event) => {
+    const id = event.sessionId;
+    if (!id || !service.enabled.has(id) || await sessionExists(id)) return;
+    service.disable(id);
+    publish();
   });
 }
 

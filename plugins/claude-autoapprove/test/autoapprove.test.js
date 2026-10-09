@@ -33,7 +33,7 @@ test('the hook approves only for sessions with a signal file, honouring the mode
   assert.equal(runHook(dir, '../s1', 'Bash'), 'prompt', 'an unsafe session id is ignored');
 });
 
-test('setup, enable and disable, without touching unrelated hooks', (t) => {
+test('setup, enable and disable, without touching unrelated hooks', async (t) => {
   const root = fs.mkdtempSync(join(tmpdir(), 'autoapprove-service-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const configDir = join(root, 'claude');
@@ -55,8 +55,8 @@ test('setup, enable and disable, without touching unrelated hooks', (t) => {
 
   fs.mkdirSync(service.signalDir, { recursive: true });
   fs.writeFileSync(join(service.signalDir, 'stale'), 'supervised');
-  service.start();
-  assert.deepEqual(fs.readdirSync(service.signalDir), [], 'stale signals from a previous run are cleared');
+  await service.start(async () => false);
+  assert.deepEqual(fs.readdirSync(service.signalDir), [], 'signals for sessions that no longer exist are cleared');
 
   assert.equal(service.state().setupOk, false);
   service.installHook();
@@ -74,4 +74,27 @@ test('setup, enable and disable, without touching unrelated hooks', (t) => {
   assert.equal(service.disable('s1'), 2, 'disabling reports how many checks were approved');
   assert.deepEqual(fs.readdirSync(service.signalDir), []);
   assert.equal(runHook(service.signalDir, 's1', 'Bash'), 'prompt');
+});
+
+test('auto-approve survives a restart for sessions that still exist, with their mode', async (t) => {
+  const root = fs.mkdtempSync(join(tmpdir(), 'autoapprove-restart-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const settings = { mode: 'laissez-faire' };
+  const api = { dataDir: join(root, 'data'), dir: pluginDir, getSetting: (key) => settings[key] };
+  const first = createService(api, { CLAUDE_CONFIG_DIR: join(root, 'claude') });
+  await first.start(async () => true);
+  first.enable('kept');
+  settings.mode = 'supervised';
+  first.enable('gone');
+  fs.appendFileSync(join(first.signalDir, 'kept.approved'), '...');
+
+  // The engine restarts (an update): 'gone' was deleted meanwhile, 'kept' was only stopped.
+  const second = createService(api, { CLAUDE_CONFIG_DIR: join(root, 'claude') });
+  await second.start(async (id) => id === 'kept');
+  assert.deepEqual(second.state().enabled, ['kept']);
+  assert.deepEqual(second.state().modes, { kept: 'laissez-faire' });
+  assert.equal(runHook(second.signalDir, 'kept', 'Bash'), 'allow', 'the resumed session is still auto-approved');
+  assert.equal(runHook(second.signalDir, 'gone', 'Bash'), 'prompt');
+  assert.deepEqual(fs.readdirSync(second.signalDir).sort(), ['kept', 'kept.approved']);
+  assert.equal(second.disable('kept'), 4, 'the approval count carries over too');
 });

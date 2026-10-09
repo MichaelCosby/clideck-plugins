@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+- Auto-approve now stays on for a session across engine restarts, updates and resumes; it is cleared only when the session is deleted. 1.0.0 turned it off silently whenever CliDeck restarted or the session stopped.
+- Sessions where it is on show a ✓ **Auto-approve** badge (**Auto-approve: all** in laissez-faire mode) in the terminal header and beside the session's name in the sidebar, with the mode in the tooltip. Needs a CliDeck version with session badges (`api.setSessionBadge`); older versions simply show no badge.
+
 ## 1.0.0
 - Rewritten for CliDeck 2.x (plugin API 1). Requires CliDeck 2.x; 1.x keeps using 0.3.0.
 - The toolbar button becomes **Set up / Enable / Disable auto-approve** in a Claude Code session's menu, since 2.x plugins cannot add their own buttons. The approval count is shown when you disable it.
