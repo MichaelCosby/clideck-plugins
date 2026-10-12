@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+- On CliDeck versions with server-side plugin actions, the **Set up / Enable / Disable auto-approve** menu items and the ✓ badge come from the plugin's server part, so every CliDeck client shows them, including the phone app. Older versions keep getting them from the browser part, as before.
+- **Disable auto-approve** now also works in a stopped session.
+
 ## 1.1.0
 - Auto-approve now stays on for a session across engine restarts, updates and resumes; it is cleared only when the session is deleted. 1.0.0 turned it off silently whenever CliDeck restarted or the session stopped.
 - Sessions where it is on show a ✓ **Auto-approve** badge (**Auto-approve: all** in laissez-faire mode) in the terminal header and beside the session's name in the sidebar, with the mode in the tooltip. Needs a CliDeck version with session badges (`api.setSessionBadge`); older versions simply show no badge.

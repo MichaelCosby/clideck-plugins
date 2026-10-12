@@ -5,7 +5,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
-const { createService, hookCommand } = require('../server');
+const { activate, createService, hookCommand } = require('../server');
 
 const pluginDir = join(__dirname, '..');
 
@@ -97,4 +97,73 @@ test('auto-approve survives a restart for sessions that still exist, with their 
   assert.equal(runHook(second.signalDir, 'gone', 'Bash'), 'prompt');
   assert.deepEqual(fs.readdirSync(second.signalDir).sort(), ['kept', 'kept.approved']);
   assert.equal(second.disable('kept'), 4, 'the approval count carries over too');
+});
+
+// A stand-in for the engine's server plugin API, with the server-side actions of CliDeck 2.4+.
+function fakeEngine(root, sessions, { serverActions = true } = {}) {
+  const engine = { actions: new Map(), badges: new Map(), toasts: [], sent: [], refreshes: 0, handlers: new Map() };
+  engine.api = {
+    dataDir: join(root, 'data'), dir: pluginDir, getSetting: () => 'supervised',
+    getSession: async (id) => sessions[id] || null,
+    sendToClients: (event, data) => engine.sent.push([event, data]),
+    onClientMessage: (event, fn) => engine.handlers.set(event, fn),
+    onEvent: () => {},
+    ...(serverActions && {
+      registerAction: (action) => { engine.actions.set(action.id, action); return () => engine.actions.delete(action.id); },
+      refreshActions: () => { engine.refreshes += 1; },
+      setSessionBadge: (id, badge) => { if (badge) engine.badges.set(id, badge); else engine.badges.delete(id); },
+      toast: (kind, options) => engine.toasts.push([kind, options.body]),
+    }),
+  };
+  engine.offered = (session) => [...engine.actions.values()]
+    .filter((action) => action.when({ surface: 'session', session }))
+    .map((action) => action.id);
+  return engine;
+}
+
+test('on engines with server actions, the menu and badges come from the server part', async (t) => {
+  const root = fs.mkdtempSync(join(tmpdir(), 'autoapprove-actions-'));
+  const previous = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = join(root, 'claude');
+  t.after(() => {
+    if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = previous;
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  const sessions = {
+    c1: { id: 'c1', provider: 'claude-code', name: 'Builder', live: true },
+    x1: { id: 'x1', provider: 'codex', name: 'Other', live: true },
+  };
+  const engine = fakeEngine(root, sessions);
+  await activate(engine.api);
+  assert.equal(engine.sent.at(-1)[1].serverActions, true, 'client.js is told to leave the menu to the engine');
+  assert.deepEqual(engine.offered(sessions.c1), ['setup']);
+  assert.deepEqual(engine.offered(sessions.x1), [], 'nothing for other agents');
+
+  await engine.actions.get('setup').run({ session: sessions.c1 });
+  assert.match(engine.toasts.at(-1)[1], /Hook added/);
+  assert.deepEqual(engine.offered(sessions.c1), ['enable']);
+
+  await engine.actions.get('enable').run({ session: sessions.c1 });
+  assert.deepEqual(engine.toasts.at(-1), ['success', 'On for Builder (supervised).']);
+  assert.equal(engine.badges.get('c1').label, 'Auto-approve');
+  assert.deepEqual(engine.offered(sessions.c1), ['disable']);
+  assert.ok(engine.refreshes > 0, 'the engine is asked to re-check the menu');
+
+  // Stopped sessions keep it, and it can be turned off there; it can't be turned on for one.
+  sessions.c1.live = false;
+  assert.deepEqual(engine.offered(sessions.c1), ['disable']);
+  await engine.actions.get('disable').run({ session: sessions.c1 });
+  assert.match(engine.toasts.at(-1)[1], /^Off for Builder\. 0 permission checks approved\./);
+  assert.equal(engine.badges.has('c1'), false);
+  assert.deepEqual(engine.offered(sessions.c1), [], 'a stopped session cannot be enabled');
+  await assert.rejects(engine.actions.get('enable').run({ session: sessions.x1 }), /only in a running Claude Code session/);
+});
+
+test('on older engines the server part only answers client.js, as before', async (t) => {
+  const root = fs.mkdtempSync(join(tmpdir(), 'autoapprove-old-engine-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const engine = fakeEngine(root, {}, { serverActions: false });
+  await activate(engine.api);
+  assert.equal(engine.sent.at(-1)[1].serverActions, false);
+  assert.ok(engine.handlers.has('toggle') && engine.handlers.has('setup') && engine.handlers.has('get-state'));
 });

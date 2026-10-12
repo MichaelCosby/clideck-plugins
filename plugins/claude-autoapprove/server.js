@@ -95,42 +95,95 @@ function createService(api, env = process.env) {
   return { state, installHook, enable, disable, start, enabled, settingsFile, signalDir };
 }
 
+function badgeFor(mode) {
+  const all = mode === 'laissez-faire';
+  return {
+    label: all ? 'Auto-approve: all' : 'Auto-approve', icon: '✓',
+    title: `Auto-approving Claude's permission checks (${all ? 'laissez-faire' : 'supervised: plan approval and questions still ask you'}). Turn it off from the session menu.`,
+  };
+}
+
 async function activate(api) {
   const service = createService(api);
   const sessionExists = async (id) => Boolean(await api.getSession(id).catch(() => null));
   await service.start(sessionExists);
-  const publish = () => api.sendToClients('state', service.state());
-  publish();
+  // CliDeck 2.4+ engines take the menu actions and badges here, so every client shows them (the phone app
+  // included); the state message tells client.js to leave them to the engine. Older engines get them from
+  // client.js, as before.
+  const serverSide = typeof api.registerAction === 'function';
+  const state = () => ({ ...service.state(), serverActions: serverSide });
+  let badged = new Set();
+  const publish = () => {
+    api.sendToClients('state', state());
+    if (!serverSide) return;
+    for (const id of badged) if (!service.enabled.has(id)) api.setSessionBadge(id, null);
+    for (const [id, mode] of service.enabled) api.setSessionBadge(id, badgeFor(mode));
+    badged = new Set(service.enabled.keys());
+    api.refreshActions();
+  };
 
-  api.onClientMessage('get-state', (_data, context) => context.reply('state', service.state()));
-
-  api.onClientMessage('setup', (_data, context) => {
+  function setup() {
     try {
       service.installHook();
-      context.reply('result', { ok: true, text: `Hook added to ${service.settingsFile}. Restart Claude Code sessions to load it, then enable auto-approve.` });
+      return { ok: true, text: `Hook added to ${service.settingsFile}. Restart Claude Code sessions to load it, then enable auto-approve.` };
     } catch (error) {
-      context.reply('result', { ok: false, text: `Hook install failed: ${error.message}` });
+      return { ok: false, text: `Hook install failed: ${error.message}` };
+    } finally {
+      publish();
     }
-    publish();
-  });
+  }
 
-  api.onClientMessage('toggle', async (data, context) => {
-    const id = String(data?.sessionId || '');
+  async function toggle(id) {
     const session = id && await api.getSession(id);
-    if (!session || session.provider !== 'claude-code' || !session.live) {
-      context.reply('result', { ok: false, text: 'Auto-approve works only in a running Claude Code session.' });
-      return;
-    }
-    const name = session.name || 'this session';
-    if (service.enabled.has(id)) {
+    // Turning it off works in a stopped session too; turning it on needs a running Claude Code session.
+    if (session && service.enabled.has(id)) {
       const count = service.disable(id);
-      context.reply('result', { ok: true, text: `Off for ${name}. ${count} permission check${count === 1 ? '' : 's'} approved.` });
-    } else {
-      const mode = service.enable(id);
-      context.reply('result', { ok: true, text: `On for ${name} (${mode}).` });
+      publish();
+      return { ok: true, text: `Off for ${session.name || 'this session'}. ${count} permission check${count === 1 ? '' : 's'} approved.` };
     }
+    if (!session || session.provider !== 'claude-code' || !session.live) {
+      return { ok: false, text: 'Auto-approve works only in a running Claude Code session.' };
+    }
+    const mode = service.enable(id);
     publish();
-  });
+    return { ok: true, text: `On for ${session.name || 'this session'} (${mode}).` };
+  }
+
+  api.onClientMessage('get-state', (_data, context) => context.reply('state', state()));
+  api.onClientMessage('setup', (_data, context) => context.reply('result', setup()));
+  api.onClientMessage('toggle', async (data, context) => context.reply('result', await toggle(String(data?.sessionId || ''))));
+
+  if (serverSide) {
+    // `when` runs once per session for each menu, so the hook check is read at most every few seconds.
+    let setupChecked = 0, setupCached = false;
+    const setupOk = () => {
+      if (Date.now() - setupChecked > 3000) { setupCached = service.state().setupOk; setupChecked = Date.now(); }
+      return setupCached;
+    };
+    const isClaude = (context) => context?.session?.provider === 'claude-code';
+    const isOn = (context) => service.enabled.has(context?.session?.id);
+    const report = (result) => {
+      if (!result.ok) throw new Error(result.text);
+      api.toast('success', { id: 'claude-autoapprove', title: 'Auto-approve', body: result.text });
+    };
+    api.registerAction({
+      id: 'setup', label: 'Set up auto-approve', icon: 'plugin', placements: ['session.menu'],
+      description: 'Add the Claude Code permission hook this plugin needs.',
+      when: (context) => isClaude(context) && !setupOk(),
+      run: () => { setupChecked = 0; report(setup()); },
+    });
+    api.registerAction({
+      id: 'enable', label: 'Enable auto-approve', icon: '✓', placements: ['session.menu'],
+      when: (context) => isClaude(context) && context.session.live && setupOk() && !isOn(context),
+      run: async (context) => report(await toggle(context.session.id)),
+    });
+    api.registerAction({
+      id: 'disable', label: 'Disable auto-approve', icon: '✕', placements: ['session.menu'],
+      when: (context) => isClaude(context) && isOn(context),
+      run: async (context) => report(await toggle(context.session.id)),
+    });
+  }
+  publish();
 
   // A stopped session keeps auto-approve for when it resumes; a deleted one (gone from CliDeck) is cleaned up.
   api.onEvent('session.closed', async (event) => {
