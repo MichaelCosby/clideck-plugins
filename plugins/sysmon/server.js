@@ -13,8 +13,64 @@ function parseMeminfo(text) {
   return { memTotal: kb('MemTotal'), memAvailable: kb('MemAvailable'), swapTotal: kb('SwapTotal'), swapFree: kb('SwapFree') };
 }
 
-// Linux reports reclaimable cache as available; elsewhere os.freemem() over-reports use, so it is marked approximate.
-function readMemory() {
+// `vm_stat`: page counts, and the page size in its header line.
+function parseVmStat(text) {
+  const size = text.match(/page size of (\d+) bytes/);
+  const pages = (label) => {
+    const match = text.match(new RegExp(`^${label}:\\s+(\\d+)`, 'm'));
+    return match ? Number(match[1]) : null;
+  };
+  return {
+    pageSize: size ? Number(size[1]) : null,
+    anonymous: pages('Anonymous pages'),
+    purgeable: pages('Pages purgeable'),
+    wired: pages('Pages wired down'),
+    compressor: pages('Pages occupied by compressor'),
+  };
+}
+
+// `sysctl -n vm.swapusage kern.memorystatus_vm_pressure_level`: one value per line.
+// "total = 2048.00M  used = 1060.25M  free = 987.75M  (encrypted)", then 1 (normal), 2 (warning) or 4 (critical).
+function parseSysctl(text) {
+  const bytes = (key) => {
+    const match = text.match(new RegExp(`${key} = ([\\d.]+)([KMGT])`));
+    return match ? Number(match[1]) * 1024 ** ' KMGT'.indexOf(match[2]) : null;
+  };
+  const level = Number(String(text).trim().split('\n').pop());
+  return {
+    swapTotal: bytes('total'),
+    swapUsed: bytes('used'),
+    pressure: { 1: 'normal', 2: 'warning', 4: 'critical' }[level] || null,
+  };
+}
+
+// macOS keeps RAM full of cache it can drop at once, so os.freemem() reads near 100% on a healthy Mac. Used is
+// what Activity Monitor calls Memory Used: app memory (anonymous less purgeable), wired, and the compressor.
+// Swap files are added as needed, so swap's "total" is only what has been allocated so far and a percentage of
+// it says little; swap is shown but does not raise alerts. The kernel's own pressure level does.
+function macMemory(vmStat, sysctl, memTotal) {
+  const vm = parseVmStat(vmStat);
+  if (!vm.pageSize || vm.anonymous == null || vm.wired == null) return null;
+  const pages = vm.anonymous - (vm.purgeable || 0) + vm.wired + (vm.compressor || 0);
+  const memUsed = Math.min(memTotal, Math.max(0, pages * vm.pageSize));
+  const sys = parseSysctl(sysctl);
+  return {
+    approx: false, memTotal, memUsed, ramPct: (memUsed / memTotal) * 100,
+    swapTotal: sys.swapTotal, swapUsed: sys.swapUsed,
+    swapPct: sys.swapTotal ? (sys.swapUsed / sys.swapTotal) * 100 : null,
+    swapAlerts: false, pressure: sys.pressure,
+  };
+}
+
+function run(file, args) {
+  return new Promise((resolve) => {
+    execFile(file, args, { timeout: 5000 }, (error, stdout) => resolve(error ? null : String(stdout)));
+  });
+}
+
+// Linux reports reclaimable cache as available. Elsewhere, with no better source, os.freemem() over-reports use,
+// so it is marked approximate.
+async function readMemory() {
   if (process.platform === 'linux') {
     try {
       const m = parseMeminfo(readFileSync('/proc/meminfo', 'utf8'));
@@ -25,6 +81,14 @@ function readMemory() {
         swapTotal: m.swapTotal, swapUsed, swapPct: m.swapTotal ? (swapUsed / m.swapTotal) * 100 : null,
       };
     } catch {}
+  }
+  if (process.platform === 'darwin') {
+    const [vmStat, sysctl] = await Promise.all([
+      run('vm_stat', []),
+      run('sysctl', ['-n', 'vm.swapusage', 'kern.memorystatus_vm_pressure_level']),
+    ]);
+    const memory = vmStat && sysctl ? macMemory(vmStat, sysctl, os.totalmem()) : null;
+    if (memory) return memory;
   }
   const memTotal = os.totalmem();
   const memUsed = memTotal - os.freemem();
@@ -78,11 +142,23 @@ function sessionUsage(sessions, processes) {
   return rows.sort((a, b) => b.bytes - a.bytes);
 }
 
+const RANK = { ok: 0, warning: 1, critical: 2 };
+
+// Why the system is at a level: the worse of RAM, swap (where it counts) and the kernel's memory pressure.
+function reasonsOf(stats, warn, critical) {
+  const byPercent = (value) => (value >= critical ? 'critical' : value >= warn ? 'warning' : 'ok');
+  const reasons = [{ level: byPercent(stats.ramPct ?? 0), text: `RAM is at ${Math.round(stats.ramPct ?? 0)}%` }];
+  if (stats.swapAlerts !== false && stats.swapPct != null) {
+    reasons.push({ level: byPercent(stats.swapPct), text: `Swap is at ${Math.round(stats.swapPct)}%` });
+  }
+  if (stats.pressure === 'warning' || stats.pressure === 'critical') {
+    reasons.push({ level: stats.pressure, text: `Memory pressure is ${stats.pressure}` });
+  }
+  return reasons.sort((a, b) => RANK[b.level] - RANK[a.level]);
+}
+
 function levelOf(stats, warn, critical) {
-  const worst = Math.max(stats.ramPct ?? 0, stats.swapPct ?? 0);
-  if (worst >= critical) return 'critical';
-  if (worst >= warn) return 'warning';
-  return 'ok';
+  return reasonsOf(stats, warn, critical)[0].level;
 }
 
 function createMonitor(api, deps = {}) {
@@ -99,7 +175,7 @@ function createMonitor(api, deps = {}) {
   };
 
   async function sample() {
-    const memory = read();
+    const memory = await read();
     const load = process.platform === 'win32' ? null : os.loadavg();
     const sessions = sessionUsage(await api.getSessions(), await processes());
     const warn = setting('warn-percent', 80);
@@ -109,10 +185,10 @@ function createMonitor(api, deps = {}) {
     const keep = Math.max(20, Math.ceil(HISTORY_SECONDS / setting('interval-sec', 15)));
     if (history.length > keep) history.splice(0, history.length - keep);
 
-    const next = levelOf(latest, warn, critical);
-    const rank = { ok: 0, warning: 1, critical: 2 };
-    if (rank[next] > rank[level] && api.getSetting('alerts') !== false) {
-      const what = (latest.swapPct ?? 0) > latest.ramPct ? `Swap is at ${Math.round(latest.swapPct)}%` : `RAM is at ${Math.round(latest.ramPct)}%`;
+    const [reason] = reasonsOf(latest, warn, critical);
+    const next = reason.level;
+    if (RANK[next] > RANK[level] && api.getSetting('alerts') !== false) {
+      const what = reason.text;
       const top = sessions[0] ? ` Largest session: ${sessions[0].name}.` : '';
       api.sendToClients('alert', { level: next, text: `${what}.${top}` });
     }
@@ -144,4 +220,4 @@ async function activate(api) {
   api.onShutdown(() => clearInterval(timer));
 }
 
-module.exports = { activate, createMonitor, levelOf, parseMeminfo, sessionUsage };
+module.exports = { activate, createMonitor, levelOf, macMemory, parseMeminfo, parseSysctl, parseVmStat, sessionUsage };

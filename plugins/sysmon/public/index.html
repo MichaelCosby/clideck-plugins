@@ -111,20 +111,27 @@
   function render() {
     const l = data.latest;
     if (!l) { app.innerHTML = '<div class="empty">Reading system stats…</div>'; return; }
-    const ramLevel = levelOf(l.ramPct, l.warn, l.critical), swapLevel = levelOf(l.swapPct, l.warn, l.critical);
+    // macOS: swap grows as needed, so it is shown in GiB and never warns; the kernel's memory pressure does.
+    const swapCounts = l.swapAlerts !== false;
+    const pressureLevel = l.pressure === "warning" || l.pressure === "critical" ? l.pressure : "ok";
+    const rank = { ok: 0, warning: 1, critical: 2 };
+    const percentLevel = levelOf(l.ramPct, l.warn, l.critical);
+    const ramLevel = rank[pressureLevel] > rank[percentLevel] ? pressureLevel : percentLevel;
+    const swapLevel = swapCounts ? levelOf(l.swapPct, l.warn, l.critical) : "ok";
+    const swapLine = swapCounts && l.swapPct != null;
     const loadLevel = l.load && l.cpus ? (l.load[0] > l.cpus ? "warning" : "ok") : "ok";
     app.innerHTML = `
       <div class="top"><h1>System monitor</h1><span class="muted">Updated ${esc(clock(l.at))}${l.approx ? " · RAM is approximate on this platform" : ""}</span></div>
       <section class="tiles" aria-label="Current usage">
         <div class="tile"><div class="tile-label"><span class="swatch" style="background:var(--ram)"></span>RAM ${statusChip(ramLevel)}</div>
-          <div class="tile-value">${pct(l.ramPct)}</div><div class="tile-sub">${gib(l.memUsed)} of ${gib(l.memTotal)}</div></div>
+          <div class="tile-value">${pct(l.ramPct)}</div><div class="tile-sub">${gib(l.memUsed)} of ${gib(l.memTotal)}${l.pressure ? ` · pressure ${esc(l.pressure)}` : ""}</div></div>
         <div class="tile"><div class="tile-label"><span class="swatch" style="background:var(--swap)"></span>Swap ${statusChip(swapLevel)}</div>
-          <div class="tile-value">${l.swapPct == null ? "None" : pct(l.swapPct)}</div><div class="tile-sub">${l.swapPct == null ? "No swap configured" : gib(l.swapUsed) + " of " + gib(l.swapTotal)}</div></div>
+          <div class="tile-value">${!swapCounts ? gib(l.swapUsed) : l.swapPct == null ? "None" : pct(l.swapPct)}</div><div class="tile-sub">${!swapCounts ? `used · ${gib(l.swapTotal)} allocated, grows as needed` : l.swapPct == null ? "No swap configured" : gib(l.swapUsed) + " of " + gib(l.swapTotal)}</div></div>
         <div class="tile"><div class="tile-label">Load average ${statusChip(loadLevel)}</div>
           <div class="tile-value">${l.load ? l.load[0].toFixed(2) : "—"}</div><div class="tile-sub">${l.load ? `5m ${l.load[1].toFixed(2)} · 15m ${l.load[2].toFixed(2)} · ${l.cpus} cores` : "Not available on this platform"}</div></div>
       </section>
       <section class="card"><div class="card-head"><h2>Memory use, last 15 minutes</h2>
-        <div class="legend"><span><span class="swatch" style="background:var(--ram)"></span>RAM</span>${l.swapPct == null ? "" : '<span><span class="swatch" style="background:var(--swap)"></span>Swap</span>'}</div></div>
+        <div class="legend"><span><span class="swatch" style="background:var(--ram)"></span>RAM</span>${!swapLine ? "" : '<span><span class="swatch" style="background:var(--swap)"></span>Swap</span>'}</div></div>
         <div class="chart" id="mem-chart"></div></section>
       ${l.load ? `<section class="card"><div class="card-head"><h2>Load average (1 minute), last 15 minutes</h2><span class="muted">Dashed line: ${l.cpus} cores</span></div><div class="chart" id="load-chart"></div></section>` : ""}
       <section class="card"><div class="card-head"><h2>Memory by session</h2><span class="muted">Each agent plus every process it started</span></div>${sessionTable(l)}</section>
@@ -132,7 +139,7 @@
     const hist = data.history || [];
     chart(document.getElementById("mem-chart"), hist, {
       max: 100, unit: "%", ticks: [0, 25, 50, 75, 100],
-      series: [{ key: "ramPct", label: "RAM", color: "var(--ram)" }, ...(l.swapPct == null ? [] : [{ key: "swapPct", label: "Swap", color: "var(--swap)" }])],
+      series: [{ key: "ramPct", label: "RAM", color: "var(--ram)" }, ...(!swapLine ? [] : [{ key: "swapPct", label: "Swap", color: "var(--swap)" }])],
       rules: [{ value: l.warn, cls: "warning", label: "Warning" }, { value: l.critical, cls: "critical", label: "Critical" }],
     });
     if (l.load) {
@@ -157,8 +164,8 @@
   }
 
   function sampleTable(hist, l) {
-    const rows = hist.slice().reverse().map((h) => `<tr><td>${esc(clock(h.at))}</td><td class="num">${pct(h.ramPct)}</td>${l.swapPct == null ? "" : `<td class="num">${pct(h.swapPct)}</td>`}<td class="num">${h.load1 == null ? "—" : h.load1.toFixed(2)}</td></tr>`).join("");
-    return `<table><thead><tr><th>Time</th><th class="num">RAM</th>${l.swapPct == null ? "" : '<th class="num">Swap</th>'}<th class="num">Load (1m)</th></tr></thead><tbody>${rows}</tbody></table>`;
+    const rows = hist.slice().reverse().map((h) => `<tr><td>${esc(clock(h.at))}</td><td class="num">${pct(h.ramPct)}</td>${!(l.swapAlerts !== false && l.swapPct != null) ? "" : `<td class="num">${pct(h.swapPct)}</td>`}<td class="num">${h.load1 == null ? "—" : h.load1.toFixed(2)}</td></tr>`).join("");
+    return `<table><thead><tr><th>Time</th><th class="num">RAM</th>${!(l.swapAlerts !== false && l.swapPct != null) ? "" : '<th class="num">Swap</th>'}<th class="num">Load (1m)</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   // ── a small line chart: one y-axis, recessive grid, dashed reference rules, direct end labels, hover readout ──

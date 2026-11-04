@@ -1,7 +1,7 @@
 {
   "id": "sysmon",
   "name": "System Monitor",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "apiVersion": 1,
   "description": "RAM, swap and load with recent history, and memory used by each session including its child processes",
   "icon": "waveform",
