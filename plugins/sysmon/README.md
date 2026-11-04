@@ -23,7 +23,7 @@ not shown. Per-session memory uses `ps`, so it works on Linux and macOS.
 In CliDeck, **Settings → Plugins → Install plugin → Install from GitHub**:
 
 ```
-https://github.com/MichaelCosby/clideck-plugins/tree/clideck-2x/plugins/sysmon
+https://github.com/MichaelCosby/clideck-plugins/tree/main/plugins/sysmon
 ```
 
 Plugins installed this way can later be updated with **Update from GitHub** on the plugin's page.

@@ -25,7 +25,7 @@ synchronously, with no network call, so it adds no latency to tool use.
 In CliDeck, **Settings → Plugins → Install plugin → Install from GitHub**:
 
 ```
-https://github.com/MichaelCosby/clideck-plugins/tree/clideck-2x/plugins/claude-autoapprove
+https://github.com/MichaelCosby/clideck-plugins/tree/main/plugins/claude-autoapprove
 ```
 
 Then choose **Set up auto-approve** from a Claude Code session's menu. It adds the hook to the `settings.json`
