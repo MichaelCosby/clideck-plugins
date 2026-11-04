@@ -18,10 +18,12 @@ Open it from the terminal header's plugin menu: **System monitor**.
 On Linux, RAM use comes from `/proc/meminfo` (`MemTotal` minus `MemAvailable`, matching `free`).
 
 On macOS, RAM use comes from `vm_stat` and matches Activity Monitor's **Memory Used**: app memory (anonymous
-pages less purgeable), wired memory and the compressor. The kernel's memory pressure level
-(`kern.memorystatus_vm_pressure_level`) is shown with it and raises alerts of its own. Swap comes from
-`sysctl vm.swapusage`. macOS adds swap files as it needs them, so its total is only what has been allocated so
-far: swap is shown in GiB and never raises an alert there.
+pages less purgeable), wired memory and the compressor. Swap comes from `sysctl vm.swapusage`. Neither raises
+alerts there: a Mac compresses memory rather than leave it idle, so RAM runs high when all is well, and macOS adds
+swap files as it needs them, so swap's total is only what has been allocated so far. Alerts come from the
+kernel's memory pressure level (`kern.memorystatus_vm_pressure_level`), the signal behind Activity Monitor's
+green, yellow and red pressure graph: yellow warns, red is critical. The RAM tile also shows the free percentage
+that `memory_pressure` prints (`kern.memorystatus_level`).
 
 Elsewhere RAM falls back to `os.freemem()`, which counts reclaimable cache as used, so it is marked approximate
 and swap is not shown. Per-session memory uses `ps`, so it works on Linux and macOS.
@@ -39,6 +41,6 @@ Plugins installed this way can later be updated with **Update from GitHub** on t
 ## Settings
 
 - **Sampling interval (seconds)**: how often to sample, 3–60 (default 15)
-- **Warning threshold (%)**: RAM or swap use that raises a warning (default 80; swap does not count on macOS)
-- **Critical threshold (%)**: RAM or swap use that raises a critical alert (default 93; swap does not count on macOS)
+- **Warning threshold (%)**: RAM or swap use that raises a warning (default 80; not used on macOS, where memory pressure decides)
+- **Critical threshold (%)**: RAM or swap use that raises a critical alert (default 93; not used on macOS, where memory pressure decides)
 - **Alert when a threshold is crossed**: toasts on or off (default on)

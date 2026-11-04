@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.0
+- macOS: RAM use no longer raises alerts. A Mac compresses memory rather than leave it idle, so Memory Used runs high when all is well; alerts come only from the kernel's memory pressure level (yellow warns, red is critical), and the RAM tile's warning follows it.
+- macOS: the RAM tile shows the free percentage `memory_pressure` reports (`kern.memorystatus_level`), and the memory chart drops the threshold lines, which no longer apply there.
+
 ## 2.1.0
 - macOS: RAM use now matches Activity Monitor's Memory Used (app memory, wired and compressed, from `vm_stat`) instead of `os.freemem()`, which counted cache as used and read near 100% on a healthy Mac.
 - macOS: the kernel's memory pressure level is shown on the RAM tile and raises warning and critical alerts.

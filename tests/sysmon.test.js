@@ -75,7 +75,7 @@ Pageouts:                                  4567.
 Swapins:                                      0.
 Swapouts:                                     0.
 `;
-const SYSCTL = 'total = 2048.00M  used = 1638.50M  free = 409.50M  (encrypted)\n1\n';
+const SYSCTL = 'total = 2048.00M  used = 1638.50M  free = 409.50M  (encrypted)\n1\n34\n';
 const GIB16 = 16 * 1024 ** 3;
 
 test('vm_stat parsing reads the page size and the counts Memory Used is made of', () => {
@@ -87,6 +87,8 @@ test('sysctl parsing reads swap in its units and the pressure level', () => {
   assert.equal(s.swapTotal, 2048 * 1024 ** 2);
   assert.equal(s.swapUsed, 1638.5 * 1024 ** 2);
   assert.equal(s.pressure, 'normal');
+  assert.equal(s.memFreePct, 34);
+  assert.equal(parseSysctl('total = 0.00M  used = 0.00M  free = 0.00M\n1\n').memFreePct, null, 'an older macOS without the free percentage');
   assert.equal(parseSysctl('total = 1.00G  used = 0.00M  free = 1.00G  (encrypted)\n4\n').swapTotal, 1024 ** 3);
   assert.equal(parseSysctl('total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)\n4\n').pressure, 'critical');
   assert.equal(parseSysctl('total = 0.00M  used = 0.00M  free = 0.00M\n2\n').pressure, 'warning');
@@ -98,16 +100,19 @@ test('macOS RAM is app memory plus wired plus compressed, not everything but fre
   assert.equal(m.memUsed, (500000 - 20000 + 150000 + 80000) * 16384);
   assert.equal(Math.round(m.ramPct), 68);
   assert.equal(m.swapAlerts, false);
+  assert.equal(m.ramAlerts, false);
+  assert.equal(m.memFreePct, 34);
   assert.equal(Math.round(m.swapPct), 80);
   assert.equal(macMemory('garbage', SYSCTL, GIB16), null, 'unparseable output falls back');
 });
 
-test('on macOS swap never alerts, and the kernel pressure level does', () => {
+test('on macOS neither RAM nor swap alerts, and the kernel pressure level does', () => {
   const mac = macMemory(VM_STAT, SYSCTL, GIB16);
   assert.equal(levelOf(mac, 80, 93), 'ok', '80% of an allocated-so-far swap is routine on a Mac');
   assert.equal(levelOf({ ...mac, pressure: 'warning' }, 80, 93), 'warning');
   assert.equal(levelOf({ ...mac, pressure: 'critical' }, 80, 93), 'critical');
-  assert.equal(levelOf({ ...mac, ramPct: 95 }, 80, 93), 'critical');
+  assert.equal(levelOf({ ...mac, ramPct: 95 }, 80, 93), 'ok', 'a full-looking Mac with normal pressure is fine');
+  assert.equal(levelOf({ ramPct: 95, swapPct: null }, 80, 93), 'critical', 'RAM still alerts on Linux');
 });
 
 test('a pressure alert says it is pressure', async () => {

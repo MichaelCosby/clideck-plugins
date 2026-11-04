@@ -1,7 +1,7 @@
 {
   "id": "sysmon",
   "name": "System Monitor",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "apiVersion": 1,
   "description": "RAM, swap and load with recent history, and memory used by each session including its child processes",
   "icon": "waveform",
@@ -22,7 +22,7 @@
       "default": 80,
       "min": 1,
       "max": 100,
-      "description": "RAM or swap use at which the monitor warns."
+      "description": "RAM or swap use at which the monitor warns. Not used on macOS, where memory pressure decides."
     },
     {
       "key": "critical-percent",
@@ -31,7 +31,7 @@
       "default": 93,
       "min": 1,
       "max": 100,
-      "description": "RAM or swap use at which the monitor raises a critical alert."
+      "description": "RAM or swap use at which the monitor raises a critical alert. Not used on macOS, where memory pressure decides."
     },
     {
       "key": "alerts",

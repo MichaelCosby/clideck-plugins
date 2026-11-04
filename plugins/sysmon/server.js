@@ -29,25 +29,29 @@ function parseVmStat(text) {
   };
 }
 
-// `sysctl -n vm.swapusage kern.memorystatus_vm_pressure_level`: one value per line.
-// "total = 2048.00M  used = 1060.25M  free = 987.75M  (encrypted)", then 1 (normal), 2 (warning) or 4 (critical).
+// `sysctl -n vm.swapusage kern.memorystatus_vm_pressure_level kern.memorystatus_level`: one value per line.
+// "total = 2048.00M  used = 1060.25M  free = 987.75M  (encrypted)"; the pressure level, 1 (normal), 2 (warning)
+// or 4 (critical), which colours Activity Monitor's pressure graph; and the free percentage `memory_pressure` prints.
 function parseSysctl(text) {
   const bytes = (key) => {
     const match = text.match(new RegExp(`${key} = ([\\d.]+)([KMGT])`));
     return match ? Number(match[1]) * 1024 ** ' KMGT'.indexOf(match[2]) : null;
   };
-  const level = Number(String(text).trim().split('\n').pop());
+  const lines = String(text).trim().split('\n');
+  const free = lines[2] === undefined ? NaN : Number(lines[2]);
   return {
     swapTotal: bytes('total'),
     swapUsed: bytes('used'),
-    pressure: { 1: 'normal', 2: 'warning', 4: 'critical' }[level] || null,
+    pressure: { 1: 'normal', 2: 'warning', 4: 'critical' }[Number(lines[1])] || null,
+    memFreePct: Number.isFinite(free) && free >= 0 && free <= 100 ? free : null,
   };
 }
 
 // macOS keeps RAM full of cache it can drop at once, so os.freemem() reads near 100% on a healthy Mac. Used is
-// what Activity Monitor calls Memory Used: app memory (anonymous less purgeable), wired, and the compressor.
-// Swap files are added as needed, so swap's "total" is only what has been allocated so far and a percentage of
-// it says little; swap is shown but does not raise alerts. The kernel's own pressure level does.
+// what Activity Monitor calls Memory Used: app memory (anonymous less purgeable), wired, and the compressor. Even
+// that runs high on a healthy Mac, which compresses memory rather than leave it idle, and swap files are added
+// as needed, so swap's "total" is only what has been allocated so far. Both are shown but neither raises alerts:
+// the kernel's pressure level, the signal macOS itself acts on, does.
 function macMemory(vmStat, sysctl, memTotal) {
   const vm = parseVmStat(vmStat);
   if (!vm.pageSize || vm.anonymous == null || vm.wired == null) return null;
@@ -58,7 +62,7 @@ function macMemory(vmStat, sysctl, memTotal) {
     approx: false, memTotal, memUsed, ramPct: (memUsed / memTotal) * 100,
     swapTotal: sys.swapTotal, swapUsed: sys.swapUsed,
     swapPct: sys.swapTotal ? (sys.swapUsed / sys.swapTotal) * 100 : null,
-    swapAlerts: false, pressure: sys.pressure,
+    ramAlerts: false, swapAlerts: false, pressure: sys.pressure, memFreePct: sys.memFreePct,
   };
 }
 
@@ -85,7 +89,7 @@ async function readMemory() {
   if (process.platform === 'darwin') {
     const [vmStat, sysctl] = await Promise.all([
       run('vm_stat', []),
-      run('sysctl', ['-n', 'vm.swapusage', 'kern.memorystatus_vm_pressure_level']),
+      run('sysctl', ['-n', 'vm.swapusage', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level']),
     ]);
     const memory = vmStat && sysctl ? macMemory(vmStat, sysctl, os.totalmem()) : null;
     if (memory) return memory;
@@ -144,10 +148,13 @@ function sessionUsage(sessions, processes) {
 
 const RANK = { ok: 0, warning: 1, critical: 2 };
 
-// Why the system is at a level: the worse of RAM, swap (where it counts) and the kernel's memory pressure.
+// Why the system is at a level: the worst of RAM and swap (where they count) and the kernel's memory pressure.
 function reasonsOf(stats, warn, critical) {
   const byPercent = (value) => (value >= critical ? 'critical' : value >= warn ? 'warning' : 'ok');
-  const reasons = [{ level: byPercent(stats.ramPct ?? 0), text: `RAM is at ${Math.round(stats.ramPct ?? 0)}%` }];
+  const reasons = [{ level: 'ok', text: 'Memory is fine' }];
+  if (stats.ramAlerts !== false) {
+    reasons.push({ level: byPercent(stats.ramPct ?? 0), text: `RAM is at ${Math.round(stats.ramPct ?? 0)}%` });
+  }
   if (stats.swapAlerts !== false && stats.swapPct != null) {
     reasons.push({ level: byPercent(stats.swapPct), text: `Swap is at ${Math.round(stats.swapPct)}%` });
   }
