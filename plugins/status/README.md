@@ -1,4 +1,4 @@
-# Session Status (deck)
+# Quick Status
 
 See at a glance which sessions need you. Each session gets one badge in the sidebar and the terminal
 header, built from two layers:
@@ -13,7 +13,7 @@ header, built from two layers:
 The badge shows the most attention-worthy thing; the tooltip has all of it, with ages:
 blocked > stage `--you` > open questions > stage `--waiting` > done > stage `--active`.
 
-## Commands (agents run these as `clideck deck/<command>`)
+## Commands (agents run these as `clideck status/<command>`)
 
 | Command | Who | What |
 |---|---|---|
@@ -32,7 +32,7 @@ sidebar shows only a badge's glyph, so open questions use `?3` (`9+` above nine)
 The cheapest way for an agent to stay current is to end each final message with
 
 ```
-[deck: questions=2 blocked=no done=no]
+[status: questions=2 blocked=no done=no]
 ```
 
 It costs a few output tokens and no tool call. `questions` is open questions waiting on you, `blocked`

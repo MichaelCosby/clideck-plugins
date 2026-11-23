@@ -3,9 +3,9 @@ const { mkdirSync, readFileSync, writeFileSync, renameSync } = require('fs');
 const { join } = require('path');
 
 // Session status for the sidebar. Two layers, both shown as one badge per session:
-//  - what a session says about itself: open questions, blocked, done (an end-of-turn "[deck: ...]" line, or
+//  - what a session says about itself: open questions, blocked, done (an end-of-turn "[status: ...]" line, or
 //    the report/questions commands);
-//  - a free-form "stage" any session can set on any other (deck/stage), with one of three attention levels.
+//  - a free-form "stage" any session can set on any other (status/stage), with one of three attention levels.
 // CliDeck never interprets a stage's words, only its level, so the workflow vocabulary lives in the repo.
 
 const LEVELS = ['you', 'waiting', 'active'];
@@ -37,10 +37,10 @@ function age(now, at) {
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-// The last "[deck: questions=2 blocked=no done=no]" line in a final message. Separators are forgiving
+// The last "[status: questions=2 blocked=no done=no]" line in a final message. Separators are forgiving
 // (spaces, commas, "·"); a bare "blocked" or "done" means yes. Returns null when there is no such line.
 function parseStatusLine(text) {
-  const matches = [...String(text ?? '').matchAll(/\[deck:([^\]\n]*)\]/gi)];
+  const matches = [...String(text ?? '').matchAll(/\[status:([^\]\n]*)\]/gi)];
   if (!matches.length) return null;
   const body = matches[matches.length - 1][1].replace(/\b(questions?|q)\s+(\d+)/gi, '$1=$2');
   const status = { questions: 0, blocked: false, done: false };
@@ -171,7 +171,7 @@ function normalizeEntry(raw) {
   return Object.keys(entry).length ? entry : null;
 }
 
-function createDeck(api, { now = Date.now } = {}) {
+function createStatus(api, { now = Date.now } = {}) {
   const file = join(api.dataDir, 'state.json');
   const entries = new Map();   // sessionId -> { status?, questionList?, stage? }
   const shown = new Map();     // sessionId -> JSON of the badge last handed to CliDeck
@@ -273,7 +273,7 @@ function createDeck(api, { now = Date.now } = {}) {
   function report({ args, sessionId }) {
     const parsed = parseFlags(args, { questions: 'value', blocked: 'bool', done: 'bool' });
     if (parsed.error) return fail(parsed.error);
-    if (parsed.rest.length) return fail('Usage: deck/report [--questions N] [--blocked] [--done]');
+    if (parsed.rest.length) return fail('Usage: status/report [--questions N] [--blocked] [--done]');
     const n = parsed.flags.questions === undefined ? 0 : Number.parseInt(parsed.flags.questions, 10);
     if (!Number.isFinite(n) || n < 0) return fail('--questions needs a number.');
     const status = { questions: Math.min(99, n), blocked: Boolean(parsed.flags.blocked), done: Boolean(parsed.flags.done), at: now() };
@@ -310,7 +310,7 @@ function createDeck(api, { now = Date.now } = {}) {
     if (!flags.clear) {
       label = clean(parsed.rest[0], MAX_LABEL);
       targets = parsed.rest.slice(1);
-      if (!label) return fail('Usage: deck/stage "<label>" --you|--waiting|--active [--icon <emoji>] [<session> ...]  (or --clear)');
+      if (!label) return fail('Usage: status/stage "<label>" --you|--waiting|--active [--icon <emoji>] [<session> ...]  (or --clear)');
       if (!levels.length) return fail('Say who needs to act: --you (the user must do something), --waiting (waiting on something outside, such as CI or review) or --active (work in progress).');
     }
     const icon = clean(flags.icon, 8);
@@ -406,35 +406,35 @@ function createDeck(api, { now = Date.now } = {}) {
 
 async function activate(api) {
   if (typeof api.setSessionBadge !== 'function' || typeof api.registerAction !== 'function') {
-    api.log('this CliDeck has no server-side badges (needs 2.4 or newer); the deck plugin does nothing.');
+    api.log('this CliDeck has no server-side badges (needs 2.4 or newer); the status plugin does nothing.');
     return;
   }
-  const deck = createDeck(api);
-  for (const [name, handler] of Object.entries(deck.commands)) api.registerCommand(name, handler);
-  api.onEvent('agent.final', (event) => deck.onFinal(event));
-  api.onEvent('turn.user', (event) => deck.onUserTurn(event));
-  api.onEvent('session.closed', (event) => deck.onClosed(event));
-  api.onShutdown(() => deck.stop());
+  const status = createStatus(api);
+  for (const [name, handler] of Object.entries(status.commands)) api.registerCommand(name, handler);
+  api.onEvent('agent.final', (event) => status.onFinal(event));
+  api.onEvent('turn.user', (event) => status.onUserTurn(event));
+  api.onEvent('session.closed', (event) => status.onClosed(event));
+  api.onShutdown(() => status.stop());
 
   api.registerAction({
     id: 'questions', label: 'Show open questions', icon: '?', placements: ['session.menu'],
     description: 'The open questions this session recorded for you.',
-    when: (context) => Boolean(deck.entries.get(context.session.id)?.questionList?.length),
+    when: (context) => Boolean(status.entries.get(context.session.id)?.questionList?.length),
     run: (context) => {
-      const list = deck.entries.get(context.session.id)?.questionList || [];
-      api.toast('info', { id: 'deck-questions', title: `Open questions · ${context.session.name || 'session'}`, body: list.map((q, i) => `${i + 1}. ${q}`).join('\n') });
+      const list = status.entries.get(context.session.id)?.questionList || [];
+      api.toast('info', { id: 'status-questions', title: `Open questions · ${context.session.name || 'session'}`, body: list.map((q, i) => `${i + 1}. ${q}`).join('\n') });
     },
   });
   api.registerAction({
     id: 'clear', label: 'Clear status and stage', icon: '✕', placements: ['session.menu'],
     description: 'Remove this session\'s status badge, for example when it is out of date.',
-    when: (context) => deck.entries.has(context.session.id),
+    when: (context) => status.entries.has(context.session.id),
     run: (context) => {
-      deck.forget(context.session.id);
-      api.toast('success', { id: 'deck-clear', body: 'Cleared.' });
+      status.forget(context.session.id);
+      api.toast('success', { id: 'status-clear', body: 'Cleared.' });
     },
   });
-  await deck.start();
+  await status.start();
 }
 
-module.exports = { activate, createDeck, parseStatusLine, badgeFor, resolveTarget, parseFlags, age };
+module.exports = { activate, createStatus, parseStatusLine, badgeFor, resolveTarget, parseFlags, age };

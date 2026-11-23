@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
-const { createDeck, parseStatusLine, badgeFor, resolveTarget, parseFlags } = require('../server');
+const { createStatus, parseStatusLine, badgeFor, resolveTarget, parseFlags } = require('../server');
 
 const SESSIONS = [
   { sessionId: 'aaaaaaaa-1', name: 'Coordinator', cwd: '/w/a', projectId: 'p1', live: true },
@@ -29,23 +29,23 @@ function fakeApi(dataDir, sessions = SESSIONS) {
 }
 
 function setup(t, options) {
-  const dir = fs.mkdtempSync(join(tmpdir(), 'deck-'));
+  const dir = fs.mkdtempSync(join(tmpdir(), 'status-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const api = fakeApi(dir, options?.sessions);
   let clock = 1_000_000;
-  const deck = createDeck(api, { now: () => clock });
-  t.after(() => deck.stop());
-  return { dir, api, deck, tick: (ms) => { clock += ms; }, cmd: (name, args, sessionId = 'aaaaaaaa-1') => deck.commands[name]({ args, stdin: '', sessionId }) };
+  const status = createStatus(api, { now: () => clock });
+  t.after(() => status.stop());
+  return { dir, api, status, tick: (ms) => { clock += ms; }, cmd: (name, args, sessionId = 'aaaaaaaa-1') => status.commands[name]({ args, stdin: '', sessionId }) };
 }
 
 test('the status line is parsed forgivingly, taking the last one', () => {
   assert.equal(parseStatusLine('no line here'), null);
-  assert.deepEqual(parseStatusLine('done.\n[deck: questions=2 blocked=no done=no]'), { questions: 2, blocked: false, done: false });
-  assert.deepEqual(parseStatusLine('[deck: questions 3 · blocked · done]'), { questions: 3, blocked: true, done: true });
-  assert.deepEqual(parseStatusLine('[DECK: q=1, blocked=yes]'), { questions: 1, blocked: true, done: false });
-  assert.deepEqual(parseStatusLine('[deck: questions=5] then later [deck: questions=0 done=yes]'), { questions: 0, blocked: false, done: true });
-  assert.deepEqual(parseStatusLine('[deck: questions=500]'), { questions: 99, blocked: false, done: false });
-  assert.deepEqual(parseStatusLine('[deck: done=false blocked=0]'), { questions: 0, blocked: false, done: false });
+  assert.deepEqual(parseStatusLine('done.\n[status: questions=2 blocked=no done=no]'), { questions: 2, blocked: false, done: false });
+  assert.deepEqual(parseStatusLine('[status: questions 3 · blocked · done]'), { questions: 3, blocked: true, done: true });
+  assert.deepEqual(parseStatusLine('[STATUS: q=1, blocked=yes]'), { questions: 1, blocked: true, done: false });
+  assert.deepEqual(parseStatusLine('[status: questions=5] then later [status: questions=0 done=yes]'), { questions: 0, blocked: false, done: true });
+  assert.deepEqual(parseStatusLine('[status: questions=500]'), { questions: 99, blocked: false, done: false });
+  assert.deepEqual(parseStatusLine('[status: done=false blocked=0]'), { questions: 0, blocked: false, done: false });
 });
 
 test('the badge shows the most attention-worthy thing and keeps the rest in the tooltip', () => {
@@ -100,21 +100,21 @@ test('targets resolve by id, project-local name, @project/name or id prefix, and
 });
 
 test('an end-of-turn line sets the badge, and a new prompt clears blocked and done but keeps questions', async (t) => {
-  const { deck, api } = setup(t);
-  deck.onFinal({ sessionId: 'bbbbbbbb-2', text: 'Need input.\n[deck: questions=2 blocked=yes done=no]' });
+  const { status, api } = setup(t);
+  status.onFinal({ sessionId: 'bbbbbbbb-2', text: 'Need input.\n[status: questions=2 blocked=yes done=no]' });
   assert.equal(api.badges.get('bbbbbbbb-2').label, 'Blocked · ?2');
-  deck.onUserTurn({ sessionId: 'bbbbbbbb-2' });
+  status.onUserTurn({ sessionId: 'bbbbbbbb-2' });
   assert.equal(api.badges.get('bbbbbbbb-2').label, '2 open questions');
-  deck.onFinal({ sessionId: 'bbbbbbbb-2', text: 'No status line this time.' });
+  status.onFinal({ sessionId: 'bbbbbbbb-2', text: 'No status line this time.' });
   assert.equal(api.badges.get('bbbbbbbb-2').label, '2 open questions', 'a missing line keeps the last status');
-  deck.onFinal({ sessionId: 'bbbbbbbb-2', text: '[deck: questions=0 done=yes]' });
+  status.onFinal({ sessionId: 'bbbbbbbb-2', text: '[status: questions=0 done=yes]' });
   assert.equal(api.badges.get('bbbbbbbb-2').label, 'Done');
-  deck.onUserTurn({ sessionId: 'bbbbbbbb-2' });
+  status.onUserTurn({ sessionId: 'bbbbbbbb-2' });
   assert.equal(api.badges.has('bbbbbbbb-2'), false, 'a new assignment makes the session not done');
 });
 
 test('report and questions are for the caller only, and a changed count drops a stale list', async (t) => {
-  const { deck, api, cmd } = setup(t);
+  const { status, api, cmd } = setup(t);
   assert.match((await cmd('report', ['--questions', '2', '--blocked'], 'bbbbbbbb-2')).stdout, /2 open questions, blocked/);
   assert.equal(api.badges.get('bbbbbbbb-2').label, 'Blocked · ?2');
   assert.equal(api.badges.has('aaaaaaaa-1'), false);
@@ -122,16 +122,16 @@ test('report and questions are for the caller only, and a changed count drops a 
   assert.equal((await cmd('report', ['--questions', 'x'], 'bbbbbbbb-2')).exitCode, 1);
 
   await cmd('questions', ['Ship on Friday?', 'Rename the flag?'], 'bbbbbbbb-2');
-  assert.deepEqual(deck.entries.get('bbbbbbbb-2').questionList, ['Ship on Friday?', 'Rename the flag?']);
+  assert.deepEqual(status.entries.get('bbbbbbbb-2').questionList, ['Ship on Friday?', 'Rename the flag?']);
   assert.match((await cmd('questions', [], 'bbbbbbbb-2')).stdout, /1\. Ship on Friday\?\n2\. Rename the flag\?/);
-  deck.onFinal({ sessionId: 'bbbbbbbb-2', text: '[deck: questions=3]' });
-  assert.equal(deck.entries.get('bbbbbbbb-2').questionList, undefined, 'the list no longer matches the count');
+  status.onFinal({ sessionId: 'bbbbbbbb-2', text: '[status: questions=3]' });
+  assert.equal(status.entries.get('bbbbbbbb-2').questionList, undefined, 'the list no longer matches the count');
   await cmd('questions', ['--clear'], 'bbbbbbbb-2');
   assert.equal(api.badges.has('bbbbbbbb-2'), false);
 });
 
 test('a coordinator can stage several sessions at once with free-form labels and an optional icon', async (t) => {
-  const { deck, api, cmd } = setup(t);
+  const { status, api, cmd } = setup(t);
   const result = await cmd('stage', ['ready to close', '--you', '--icon', '🧹', 'TICKET-1', 'TICKET-2']);
   assert.equal(result.exitCode, 0);
   assert.equal(api.badges.get('bbbbbbbb-2').label, 'ready to close');
@@ -147,13 +147,13 @@ test('a coordinator can stage several sessions at once with free-form labels and
 
   const self = await cmd('stage', ['implementing', '--active'], 'bbbbbbbb-2');
   assert.equal(self.exitCode, 0);
-  assert.equal(deck.entries.get('bbbbbbbb-2').stage.label, 'implementing');
+  assert.equal(status.entries.get('bbbbbbbb-2').stage.label, 'implementing');
 
   assert.match((await cmd('stage', ['x'])).stderr, /Say who needs to act/);
   assert.match((await cmd('stage', ['x', '--you', '--waiting'])).stderr, /Choose one/);
   assert.match((await cmd('stage', ['x', '--you', '--icon', 'abc'])).stderr, /--icon/);
   assert.equal((await cmd('stage', ['--clear', 'TICKET-1'])).exitCode, 0);
-  assert.equal(deck.entries.get('bbbbbbbb-2'), undefined);
+  assert.equal(status.entries.get('bbbbbbbb-2'), undefined);
 });
 
 test('stages and list report on the caller\'s project, and --all widens it', async (t) => {
@@ -173,11 +173,11 @@ test('state survives a restart, drops deleted sessions, and ages refresh the too
   const first = setup(t);
   await first.cmd('stage', ['waiting for review', '--waiting', 'TICKET-1']);
   await first.cmd('report', ['--questions', '1'], 'eeeeeeee-5');
-  first.deck.stop();
+  first.status.stop();
 
   const api = fakeApi(first.dir, SESSIONS.filter((s) => s.sessionId !== 'eeeeeeee-5'));
   let clock = 1_000_000 + 3 * 3_600_000;
-  const second = createDeck(api, { now: () => clock });
+  const second = createStatus(api, { now: () => clock });
   t.after(() => second.stop());
   await second.start();
   assert.equal(api.badges.get('bbbbbbbb-2').label, 'waiting for review');
@@ -189,9 +189,9 @@ test('state survives a restart, drops deleted sessions, and ages refresh the too
 });
 
 test('forget removes a session\'s badge', async (t) => {
-  const { deck, api, cmd } = setup(t);
+  const { status, api, cmd } = setup(t);
   await cmd('stage', ['x', '--you', 'TICKET-1']);
   assert.ok(api.badges.has('bbbbbbbb-2'));
-  deck.forget('bbbbbbbb-2');
+  status.forget('bbbbbbbb-2');
   assert.equal(api.badges.has('bbbbbbbb-2'), false);
 });

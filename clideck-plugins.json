@@ -11,9 +11,9 @@
       "path": "plugins/sysmon"
     },
     {
-      "id": "deck",
-      "name": "Session Status",
-      "path": "plugins/deck"
+      "id": "status",
+      "name": "Quick Status",
+      "path": "plugins/status"
     }
   ]
 }

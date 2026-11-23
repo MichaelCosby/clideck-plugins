@@ -1,0 +1,36 @@
+{
+  "id": "status",
+  "name": "Quick Status",
+  "version": "0.2.0",
+  "apiVersion": 1,
+  "description": "At-a-glance status for sessions: open questions, blocked, done, and free-form stages such as \"waiting for CI\", shown as badges.",
+  "guide": "Keep the user's session status current so they can see at a glance who needs them. End EVERY final message with one line: [status: questions=N blocked=yes|no done=yes|no]. questions = open questions or decisions still waiting on the user, including earlier ones not yet answered; blocked = you cannot continue until they answer; done = ALL work assigned to you is finished or handed off (a todo written, returned to whoever assigned it), not merely this turn. Restate it every turn; a missing line leaves the old status in place. If you coordinate other sessions, mark them with `clideck status/stage \"<label>\" --you|--waiting|--active <session> ...` and reuse labels from `clideck status/stages`.",
+  "icon": "◆",
+  "commands": [
+    {
+      "name": "report",
+      "description": "Set your status directly (omitted flags reset); the usual way is the end-of-turn line [status: questions=N blocked=yes|no done=yes|no]. questions = open questions for the user; blocked = you cannot continue until they answer; done = ALL assigned work finished or handed off.",
+      "usage": "status/report [--questions N] [--blocked] [--done]"
+    },
+    {
+      "name": "questions",
+      "description": "Record your open questions for the user, one short line each, so they can list them later. Replaces your earlier list; no arguments lists it. Only needed when the list changes.",
+      "usage": "status/questions [\"question\" ...] [--clear]"
+    },
+    {
+      "name": "stage",
+      "description": "Mark a session's stage with a free-form label and who must act: --you (the user), --waiting (something outside, such as CI or review) or --active (work in progress). Names none or several sessions (default: yourself); --clear removes it. Reuse labels from status/stages. --icon adds an optional emoji.",
+      "usage": "status/stage \"<label>\" --you|--waiting|--active [--icon <emoji>] [<session> ...]"
+    },
+    {
+      "name": "stages",
+      "description": "List the stage labels already in use in your project, with their levels and counts, so you reuse them instead of inventing variants.",
+      "usage": "status/stages [--all] [--json]"
+    },
+    {
+      "name": "list",
+      "description": "Show each session's status (stage, open questions, blocked, done) in your project.",
+      "usage": "status/list [--all] [--json]"
+    }
+  ]
+}
