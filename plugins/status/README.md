@@ -1,4 +1,4 @@
-# Quick Status
+# Status Indicators
 
 See at a glance which sessions need you. Each session gets one badge in the sidebar and the terminal
 header, built from two layers:

@@ -12,7 +12,7 @@
     },
     {
       "id": "status",
-      "name": "Quick Status",
+      "name": "Status Indicators",
       "path": "plugins/status"
     }
   ]

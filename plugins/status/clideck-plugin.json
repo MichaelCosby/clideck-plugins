@@ -1,6 +1,6 @@
 {
   "id": "status",
-  "name": "Quick Status",
+  "name": "Status Indicators",
   "version": "0.2.0",
   "apiVersion": 1,
   "description": "At-a-glance status for sessions: open questions, blocked, done, and free-form stages such as \"waiting for CI\", shown as badges.",
