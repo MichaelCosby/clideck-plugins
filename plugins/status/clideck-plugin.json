@@ -1,7 +1,7 @@
 {
   "id": "status",
   "name": "Status Indicators",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "apiVersion": 1,
   "description": "At-a-glance status for sessions: open questions, blocked, done, and free-form stages such as \"waiting for CI\", shown as badges.",
   "guide": "Keep the user's session status current so they can see at a glance who needs them. End EVERY final message with one line: [status: questions=N blocked=yes|no done=yes|no]. questions = open questions or decisions still waiting on the user, including earlier ones not yet answered; blocked = you cannot continue until they answer; done = ALL work assigned to you is finished or handed off (a todo written, returned to whoever assigned it), not merely this turn. Restate it every turn; a missing line leaves the old status in place. If you coordinate other sessions, mark them with `clideck status/stage \"<label>\" --you|--waiting|--active <session> ...` and reuse labels from `clideck status/stages`.",

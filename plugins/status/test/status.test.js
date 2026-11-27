@@ -109,6 +109,7 @@ test('an end-of-turn line sets the badge, and a new prompt clears blocked and do
   assert.equal(api.badges.get('bbbbbbbb-2').label, '2 open questions', 'a missing line keeps the last status');
   status.onFinal({ sessionId: 'bbbbbbbb-2', text: '[status: questions=0 done=yes]' });
   assert.equal(api.badges.get('bbbbbbbb-2').label, 'Done');
+  assert.equal(api.badges.get('bbbbbbbb-2').icon, '✅');
   status.onUserTurn({ sessionId: 'bbbbbbbb-2' });
   assert.equal(api.badges.has('bbbbbbbb-2'), false, 'a new assignment makes the session not done');
 });

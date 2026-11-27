@@ -76,7 +76,7 @@ function badgeFor(entry, now) {
   let label, icon;
   if (kind === 'blocked') { label = `Blocked${withQuestions}`; icon = BLOCKED_ICON; }
   else if (kind === 'questions') { label = plural(questions, 'open question'); icon = questions > 9 ? '9+' : `?${questions}`; }
-  else if (kind === 'done') { label = 'Done'; icon = '✓'; }
+  else if (kind === 'done') { label = 'Done'; icon = '✅'; }
   else {
     const suffix = `${withQuestions}${done ? ' · done' : ''}`;
     label = fit(stage.label, BADGE_LABEL - [...suffix].length) + suffix;
